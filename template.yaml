@@ -1,0 +1,134 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  Application template/sample
+
+Transform:
+  - AWS::Serverless-2016-10-31
+
+Parameters:
+
+  Text:
+    Type: String
+    Description: Incoming text to be displayed by the lambda function
+
+
+Resources:
+
+  HellowWorldLambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: "/"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "lambda.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+  
+
+  ApiGatewayAPIs:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: !Sub my-first-api
+      StageName: Prod
+      MinimumCompressionSize: 0
+      TracingEnabled: true
+      MethodSettings:
+        - HttpMethod: "*" # All methods
+          ResourcePath: "/*" # All paths
+          LoggingLevel: ERROR # INFO or ERROR
+          DataTraceEnabled: false # Put request/response data into cloudwatch
+          MetricsEnabled: true # Enable detailed metrics (error 404, latence, ...)
+          ThrottlingRateLimit: 400 # 400/second limit across all methods in APIGW
+          ThrottlingBurstLimit: 400 # Allow up to 50 requests to arrive in input bucket before throwing http-429 errors
+      DefinitionBody:
+        openapi: 3.0.1
+        info:
+          title: API lambda integration
+          description: Example API
+          version: "0.1"
+        x-amazon-apigateway-request-validators:
+          "VALIDATE_ALL":
+            validateRequestBody: true
+            validateRequestParameters: true
+        x-amazon-apigateway-request-validator: VALIDATE_ALL
+        paths:
+          /hello-world/test:
+            post:
+              summary: Hello world test POST call
+              description: Hello world test
+              x-amazon-apigateway-request-validator: VALIDATE_ALL
+              responses:
+                "200":
+                  description: Success
+                  content:
+                    application/json:
+                      schema:
+                        type: array
+                        
+                "400":
+                  description: Bad Request
+                  content:
+                    application/json:
+                      examples:
+                        Bad request:
+                          description: Bad request
+                          value:
+                            resourceType: OperationOutcome
+                            issue:
+                              severity: error
+                              code: not-supported
+                              diagnostics:
+                                "Invalid request"
+              security:
+                - api_key: []
+              x-amazon-apigateway-integration:
+                httpMethod: "POST"
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${HellowWorldLambdaFunction.Arn}:prod/invocations"
+                passthroughBehavior: "when_no_match"
+                contentHandling: "CONVERT_TO_TEXT"
+                type: "aws_proxy"
+
+
+  HellowWorldLambdaFunctionApiGatewayInvoke:
+    Type: "AWS::Lambda::Permission"
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !Ref HellowWorldLambdaFunction.Alias
+      Principal: "apigateway.amazonaws.com"
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayAPIs}/*"
+
+
+
+  HellowWorldLambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./dist
+      Handler: index.handler
+      Runtime: nodejs16.x
+      MemorySize: 256
+      Timeout: 480
+      ProvisionedConcurrencyConfig: 
+        ProvisionedConcurrentExecutions: 10
+      AutoPublishAlias: prod
+      Description: Invokes Example API
+      Tracing: Active
+      Role: !GetAtt HellowWorldLambdaExecutionRole.Arn
+      Environment:
+        Variables:
+          TEXT: !Sub ${Text}
+
+
+
+Outputs:
+
+  HellowWorldLambdaFunctionName:
+    Description: Name of hello world lambfe function
+    Value: !Ref HellowWorldLambdaFunction
+    Export:
+      Name: !Sub "HellowWorldLambdaFunctionName"

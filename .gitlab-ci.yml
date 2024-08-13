@@ -1,0 +1,38 @@
+stages:
+  	- test
+    - deploy
+
+variables:
+  DEV_ROLE_ARN: <dev-iamrole-arn>
+  DEPLOY_BUCKET_DEV: <s3-bucket-name>
+
+api-quality:
+  image: public.ecr.aws/sam/build-nodejs16.x
+  stage: test
+  tags:
+    - aws
+  script:
+    - npm install
+
+
+deploy-api:
+  image: public.ecr.aws/sam/build-nodejs16.x
+  stage: deploy
+  variables:
+    AWS_DEFAULT_REGION: "ap-southeast-2"
+    AWS_DEPLOYMENT_ROLE_ARN: $DEV_ROLE_ARN
+    APP_NAME: hello-world-api
+    DEPLOY_BUCKET: $DEPLOY_BUCKET_DEV
+  tags:
+    - aws
+  environment:
+    name: dev
+  script:
+    - chmod u+x ./assumerole.sh
+    - source ./assumerole.sh "${AWS_DEFAULT_REGION}" "${APP_NAME}" "${AWS_DEPLOYMENT_ROLE_ARN}"
+    - npm install
+    - npm run build
+    - chmod u+x ./build.sh
+    - ./build.sh
+    - chmod u+x ./deploy.sh
+    - ./deploy.sh

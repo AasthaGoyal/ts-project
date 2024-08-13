@@ -1,0 +1,13 @@
+{
+  "devDependencies": {
+    "typescript": "^5.5.4"
+  },
+  "dependencies": {
+    "sam": "^0.0.7"
+  },
+  "scripts": {
+    "tsc": "tsc -b",
+    "build": "gulp  --legacy-peer-deps",
+    "eslint": "eslint . --ext .ts"  
+  }
+}

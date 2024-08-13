@@ -1,0 +1,3 @@
+**/node_modules/**
+generated-template.yaml
+/dist
